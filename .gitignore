@@ -1,2 +1,5 @@
 /target
+
+# used for tests
 *.tar
+friday/

@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.71"
 bollard = "0.14.0"
-docker-api = "0.13.0"
 futures = "0.3.28"
+tar = "0.4.38"
 tokio = { version = "1.28.0", features = ["full"] }
