@@ -27,6 +27,10 @@ struct Cli {
     #[arg(long, short)]
     image: String,
 
+    #[arg(long, global = true)]
+    /// enable trace logs
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -68,8 +72,10 @@ enum LayerCommands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().init();
     let cli = Cli::try_parse()?;
+    if cli.verbose {
+        tracing_subscriber::fmt().init();
+    }
 
     let tmp_dir = tempfile::tempdir()?;
     let base_name = name_from_image(&cli.image);
