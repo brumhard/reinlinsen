@@ -14,11 +14,9 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::instrument;
 
-const IMAGE: &str = "reinlinsen-test";
-
 // https://github.com/wagoodman/dive/blob/c7d121b3d72aeaded26d5731819afaf49b686df6/dive/filetree/file_tree.go#L20
 // https://github.com/moby/moby/blob/master/image/spec/v1.2.md#creating-an-image-filesystem-changeset
-const WHITE_OUT_PREFIX: &str = ".wh.";
+const WHITEOUT_PREFIX: &str = ".wh.";
 
 use clap::{Parser, Subcommand};
 
@@ -73,9 +71,9 @@ async fn main() -> Result<()> {
         todo!()
     }
 
-    let base_name = name_from_image(cli.image);
+    let base_name = name_from_image(&cli.image);
     let tar_file = format!("{base_name}.tar");
-    save_image(IMAGE, &tar_file).await?;
+    save_image(&cli.image, &tar_file).await?;
     extract_tar(&tar_file, &base_name)?;
 
     let manifest = read_manifest(&format!("{base_name}/manifest.json"))?;
@@ -106,8 +104,8 @@ fn extract_layers<P: AsRef<Path> + Debug + Display>(
                 .unwrap_or_default()
                 .to_str()
                 .unwrap_or_default();
-            if file_name.starts_with(WHITE_OUT_PREFIX) {
-                let delete_file = file_name.trim_start_matches(WHITE_OUT_PREFIX);
+            if file_name.starts_with(WHITEOUT_PREFIX) {
+                let delete_file = file_name.trim_start_matches(WHITEOUT_PREFIX);
                 let delete_dir = path.parent().unwrap_or(Path::new("/"));
                 let full_to_delete = out_dir.as_ref().join(delete_dir.join(delete_file));
                 fs::remove_dir_all(&full_to_delete)
@@ -208,8 +206,16 @@ async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> 
         }))
         .await?;
 
-    if list.len() != 1 {
-        return Err(anyhow!("ref should match exactly one image"));
+    match list.len() {
+        0 => {
+            // TODO: pull image instead
+            // TODO: support passing credentials for that
+            return Err(anyhow!(
+                "image was not found locally, run docker pull first"
+            ));
+        }
+        1 => (),
+        _ => return Err(anyhow!("ref should match exactly one image")),
     }
 
     tracing::info!("exporting image to tar");
