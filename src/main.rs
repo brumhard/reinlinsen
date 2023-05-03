@@ -9,6 +9,7 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;
+use tempfile::tempfile;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
@@ -35,13 +36,16 @@ enum Commands {
     /// subcommands that operatate on single layers
     Layer {
         #[arg(long, short)]
-        layer: u8,
+        layer: usize,
 
         #[command(subcommand)]
         command: LayerCommands,
     },
     /// full dump of all layers
-    Dump {},
+    Dump {
+        #[arg(long, short)]
+        output: PathBuf,
+    },
     /// extract a file from the full dump
     Extract {},
 }
@@ -65,28 +69,36 @@ enum LayerCommands {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
-    let cli = Cli::parse();
+    let cli = Cli::try_parse()?;
 
-    if !matches!(cli.command, Commands::Dump {}) {
+    let tmp_dir = tempfile::tempdir()?;
+    let base_name = name_from_image(&cli.image);
+
+    let archive_path = tmp_dir.path().join(format!("{base_name}.tar"));
+    save_image(&cli.image, &archive_path).await?;
+
+    let unpack_path = tmp_dir.path().join(&base_name);
+    extract_tar(&archive_path, &unpack_path)?;
+
+    let manifest_path = unpack_path.join("manifest.json");
+    let manifest = read_manifest(&manifest_path)?;
+
+    let config_path = unpack_path.join(manifest.config);
+    let config = read_config(&config_path)?;
+
+    if let Commands::Dump { output } = cli.command {
+        extract_layers(&manifest.layers, &unpack_path, &output)?;
+    } else {
         todo!()
     }
-
-    let base_name = name_from_image(&cli.image);
-    let tar_file = format!("{base_name}.tar");
-    save_image(&cli.image, &tar_file).await?;
-    extract_tar(&tar_file, &base_name)?;
-
-    let manifest = read_manifest(&format!("{base_name}/manifest.json"))?;
-    let config = read_config(&format! {"{}/{}", base_name, manifest.config})?;
-    extract_layers(&manifest.layers, &base_name, &format!("{base_name}-fs"))?;
 
     Ok(())
 }
 
 #[instrument(skip(layers))]
-fn extract_layers<P: AsRef<Path> + Debug + Display>(
+fn extract_layers<P: AsRef<Path> + Debug>(
     layers: &[String],
-    tar_dir: P,
+    unpack_path: P,
     out_dir: P,
 ) -> Result<()> {
     _ = fs::remove_dir_all(&out_dir);
@@ -94,7 +106,7 @@ fn extract_layers<P: AsRef<Path> + Debug + Display>(
 
     for layer in layers {
         tracing::info!(layer, "unpacking layer");
-        let file = File::open(format!("{tar_dir}/{layer}"))?;
+        let file = File::open(unpack_path.as_ref().join(&layer))?;
         let mut archive = Archive::new(file);
         for file in archive.entries()? {
             let mut f = file?;
@@ -151,13 +163,13 @@ struct HistoryEntry {
     comment: String,
 }
 
-fn read_config(path: &str) -> Result<Config> {
+fn read_config<P: AsRef<Path> + Debug>(path: P) -> Result<Config> {
     let config_str = fs::read_to_string(path)?;
     let config: Config = serde_json::from_str(&config_str)?;
     Ok(config)
 }
 
-fn read_manifest(path: &str) -> Result<Manifest> {
+fn read_manifest<P: AsRef<Path> + Debug>(path: P) -> Result<Manifest> {
     let manifest_str = fs::read_to_string(path)?;
     let mut manifests: Vec<Manifest> = serde_json::from_str(&manifest_str)?;
 
@@ -169,9 +181,9 @@ fn read_manifest(path: &str) -> Result<Manifest> {
 }
 
 #[instrument]
-fn extract_tar<P: AsRef<Path> + Debug>(path: P, out_dir: P) -> Result<()> {
+fn extract_tar<P: AsRef<Path> + Debug>(archive_path: P, out_dir: P) -> Result<()> {
     tracing::info!("recreating output dir");
-    let file = File::open(path)?;
+    let file = File::open(archive_path)?;
     _ = fs::remove_dir_all(&out_dir);
     fs::create_dir(&out_dir)?;
 
