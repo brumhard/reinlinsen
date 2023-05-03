@@ -14,7 +14,11 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::instrument;
 
-const IMAGE: &str = "ghcr.io/brumhard/friday:0.1.0";
+const IMAGE: &str = "reinlinsen-test";
+
+// https://github.com/wagoodman/dive/blob/c7d121b3d72aeaded26d5731819afaf49b686df6/dive/filetree/file_tree.go#L20
+// https://github.com/moby/moby/blob/master/image/spec/v1.2.md#creating-an-image-filesystem-changeset
+const WHITE_OUT_PREFIX: &str = ".wh.";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -46,6 +50,20 @@ fn extract_layers<P: AsRef<Path> + Debug + Display>(
         let mut archive = Archive::new(file);
         for file in archive.entries()? {
             let mut f = file?;
+            let path = f.path()?;
+            let file_name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default();
+            if file_name.starts_with(WHITE_OUT_PREFIX) {
+                let delete_file = file_name.trim_start_matches(WHITE_OUT_PREFIX);
+                let delete_dir = path.parent().unwrap_or(Path::new("/"));
+                let full_to_delete = out_dir.as_ref().join(delete_dir.join(delete_file));
+                fs::remove_dir_all(&full_to_delete)
+                    .or_else(|_| fs::remove_file(&full_to_delete))?;
+                continue;
+            }
             f.unpack_in(&out_dir)?;
         }
     }
