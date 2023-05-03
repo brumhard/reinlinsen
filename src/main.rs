@@ -26,10 +26,12 @@ async fn main() -> Result<()> {
 
     let base_name = name_from_image(IMAGE);
     let tar_file = format!("{base_name}.tar");
-
     save_image(IMAGE, &tar_file).await?;
     extract_tar(&tar_file, &base_name)?;
+
     let manifest = read_manifest(&format!("{base_name}/manifest.json"))?;
+    let config = read_config(&format! {"{}/{}", base_name, manifest.config})?;
+    println!("config: {:?}", config.clean_history());
     extract_layers(&manifest.layers, &base_name, &format!("{base_name}-fs"))?;
 
     Ok(())
@@ -78,6 +80,35 @@ struct Manifest {
     repo_tags: Vec<String>,
     #[serde(rename = "Layers")]
     layers: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Config {
+    architecture: String,
+    history: Vec<HistoryEntry>,
+    os: String,
+}
+
+impl Config {
+    fn clean_history(&self) -> Vec<&HistoryEntry> {
+        self.history.iter().filter(|e| !e.empty_layer).collect()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct HistoryEntry {
+    #[serde(default)]
+    empty_layer: bool,
+    created: String,
+    created_by: String,
+    #[serde(default)]
+    comment: String,
+}
+
+fn read_config(path: &str) -> Result<Config> {
+    let config_str = fs::read_to_string(path)?;
+    let config: Config = serde_json::from_str(&config_str)?;
+    Ok(config)
 }
 
 fn read_manifest(path: &str) -> Result<Manifest> {
