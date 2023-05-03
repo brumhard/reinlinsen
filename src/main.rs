@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::fs::{self, File};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;
 use tokio::fs::OpenOptions;
@@ -20,18 +20,66 @@ const IMAGE: &str = "reinlinsen-test";
 // https://github.com/moby/moby/blob/master/image/spec/v1.2.md#creating-an-image-filesystem-changeset
 const WHITE_OUT_PREFIX: &str = ".wh.";
 
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[arg(long, short)]
+    image: String,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// subcommands that operatate on single layers
+    Layer {
+        #[arg(long, short)]
+        layer: u8,
+
+        #[command(subcommand)]
+        command: LayerCommands,
+    },
+    /// full dump of all layers
+    Dump {},
+    /// extract a file from the full dump
+    Extract {},
+}
+
+#[derive(Subcommand)]
+enum LayerCommands {
+    /// list layers with creation command
+    List {},
+    /// show layer info with included files
+    Inspect {},
+    /// dump only this layer
+    Dump {
+        #[arg(long)]
+        /// include preceding layers into the output
+        stack: bool,
+    },
+    /// extract a file from the layer
+    Extract {},
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
+    let cli = Cli::parse();
 
-    let base_name = name_from_image(IMAGE);
+    if !matches!(cli.command, Commands::Dump {}) {
+        todo!()
+    }
+
+    let base_name = name_from_image(cli.image);
     let tar_file = format!("{base_name}.tar");
     save_image(IMAGE, &tar_file).await?;
     extract_tar(&tar_file, &base_name)?;
 
     let manifest = read_manifest(&format!("{base_name}/manifest.json"))?;
     let config = read_config(&format! {"{}/{}", base_name, manifest.config})?;
-    println!("config: {:?}", config.clean_history());
     extract_layers(&manifest.layers, &base_name, &format!("{base_name}-fs"))?;
 
     Ok(())

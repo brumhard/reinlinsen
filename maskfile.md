@@ -5,6 +5,8 @@
 > builds the test docker image and runs
 
 ```sh
-docker build -f test.Dockerfile  -t reinlinsen-test .
-cargo run
+image_name="reinlinsen-test"
+rm -rf "$image_name"*
+docker build -f test.Dockerfile  -t "$image_name" .
+cargo run -- --image "$image_name" dump
 ```
