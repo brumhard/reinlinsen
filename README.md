@@ -1,15 +1,16 @@
-# reinlinsen
+# reinlinsen 👀
 
-`rl` is a tool to inspect OCI images.
+`rl` is a tool to inspect and dump OCI images or single image layers.
 
-goal:
+## Features
 
 ```shell
-rl layer ls <image> -> list layers with creation command
-rl layer inspect <image> -l <layer> -> show layer info with included files
-rl layer dump <image> -l <layer> -o dir -> dump only this layer
-rl layer dump <image> -l <layer> -o dir --stack -> include preceding layers into the output
-rl layer extract <image> -l <layer> -f file -o file -> extract a file from the layer
-rl dump <image> -o dir -> full dump of all layers
-rl extract <image> -f file -o file -> extract a file from the full dump
+rl dump <image> -o <dir> # full dump of all layers
+rl extract <image> -p <src> -o <dest> # extract a file or dir from the full dump
+
+rl layer ls <image> # list all image layers
+rl layer inspect <image> -l <layer> # show image layer's files
+rl layer dump <image> -l <layer> -o <dir> # dump only this layer
+rl layer dump <image> -l <layer> -o <dir> --stack # include preceding layers into the output
+rl layer extract <image> -l <layer> -p <src> -o <dest> # extract a file or dir from the layer
 ```
