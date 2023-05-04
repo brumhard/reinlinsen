@@ -3,6 +3,7 @@
     nixpkgs.url = "github:nixos/nixpkgs";
     utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
+    fenix.url = "github:nix-community/fenix";
   };
 
   outputs = { self, nixpkgs, utils, naersk, fenix }: utils.lib.eachDefaultSystem
@@ -12,7 +13,14 @@
         version = "latest";
         # https://discourse.nixos.org/t/using-nixpkgs-legacypackages-system-vs-import/17462/7
         pkgs = nixpkgs.legacyPackages.${system};
-        naersk' = naersk.lib.${system};
+        toolchain = fenix.packages.${system}.fromToolchainFile {
+          file = ./rust-toolchain;
+          sha256 = "sha256-eMJethw5ZLrJHmoN2/l0bIyQjoTX1NsvalWSscTixpI=";
+        };
+        naersk' = naersk.lib.${system}.override {
+          cargo = toolchain;
+          rustc = toolchain;
+        };
       in
       with pkgs;
       rec {
@@ -36,6 +44,7 @@
           packages = [
             cargo-audit
             mask
+            goreleaser
           ];
         };
       }
