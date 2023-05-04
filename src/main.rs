@@ -30,10 +30,11 @@ use clap::{Parser, Subcommand};
 #[command(author, version, about, long_about = None)]
 struct Cli {
     #[arg(long, short)]
+    /// Reference to the image that should be used
     image: String,
 
     #[arg(long, global = true)]
-    /// enable trace logs
+    /// Enable trace logs
     verbose: bool,
 
     #[command(subcommand)]
@@ -42,51 +43,69 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// subcommands that operatate on single layers
+    /// Investigate single layers
     Layer {
         #[command(subcommand)]
         command: LayerCommands,
     },
-    /// full dump of all layers
+    /// Dump all image layers into output
     Dump {
         #[arg(long, short)]
+        /// Path to output directory.
+        /// If it already exists, it will be overwritten
         output: PathBuf,
     },
-    /// extract a file from the full dump
+    /// Extract a single file from any layer
     Extract {
         #[arg(long, short)]
+        /// Path to source in the image.
         path: PathBuf,
         #[arg(long, short)]
+        /// Path to output directory.
         output: PathBuf,
     },
 }
 
 #[derive(Subcommand)]
 enum LayerCommands {
-    /// list layers with creation command
+    /// List all layers with creation command
     List {},
-    /// show layer info with included files
+    /// Show layer info with added/removed files
     Inspect {
         #[arg(long, short, allow_hyphen_values = true)]
+        /// Layer number as shown in the list output starting at 0.
+        /// If it's a negative number it uses negative indexing,
+        /// so -1 means last layer.
         layer: i16,
     },
-    /// dump only this layer
+    /// Dump a single image layer. This will preserve whiteout files.
     Dump {
         #[arg(long, short, allow_hyphen_values = true)]
+        /// Layer number as shown in the list output starting at 0.
+        /// If it's a negative number it uses negative indexing,
+        /// so -1 means last layer.
         layer: i16,
         #[arg(long)]
-        /// include preceding layers into the output
+        /// Toggle to include preceding layers into the output.
+        /// This means --layer -1 --stack is the same as a full dump.
         stack: bool,
         #[arg(long, short)]
+        /// Path to output directory.
+        /// If it already exists, it will be overwritten
         output: PathBuf,
     },
     /// extract a file from the layer
     Extract {
         #[arg(long, short, allow_hyphen_values = true)]
+        /// Layer number as shown in the list output starting at 0.
+        /// If it's a negative number it uses negative indexing,
+        /// so -1 means last layer.
         layer: i16,
         #[arg(long, short)]
+        /// Path to source in the image layer.
         path: PathBuf,
         #[arg(long, short)]
+        /// Path to output directory.
         output: PathBuf,
     },
 }
