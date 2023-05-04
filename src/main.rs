@@ -1,24 +1,19 @@
 use anyhow::{anyhow, Result};
 use bollard::image::ListImagesOptions;
 use bollard::Docker;
-use fs_extra::dir::CopyOptions;
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::fs::{self, File};
-use std::hash::Hash;
 use std::io::stdout;
-use std::os;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;
-use tempfile::tempfile;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::instrument;
-use tracing_subscriber::fmt::format;
 
 // https://github.com/wagoodman/dive/blob/c7d121b3d72aeaded26d5731819afaf49b686df6/dive/filetree/file_tree.go#L20
 // https://github.com/moby/moby/blob/master/image/spec/v1.2.md#creating-an-image-filesystem-changeset
@@ -112,7 +107,7 @@ enum LayerCommands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::try_parse()?;
+    let cli = Cli::parse();
     if cli.verbose {
         tracing_subscriber::fmt().init();
     }
@@ -160,11 +155,11 @@ async fn main() -> Result<()> {
                 if stack {
                     start_index = 0;
                 }
-                extract_layers(&manifest.layers[start_index..layer + 1], &unpack_path, &output)?
+                extract_layers(&manifest.layers[start_index..=layer], &unpack_path, &output)?;
             }
             LayerCommands::Extract { layer, path, output } => {
                 let layer = convert_layer_num(&manifest, layer)?;
-                extract_layers(&manifest.layers[layer..layer + 1], &unpack_path, &tmp_dump_path)?;
+                extract_layers(&manifest.layers[layer..=layer], &unpack_path, &tmp_dump_path)?;
                 mv(tmp_dump_path.join(clean_path(path)?), output)?;
             }
         },
@@ -220,7 +215,7 @@ struct LayerInfo {
 }
 
 fn layer_info<P: AsRef<Path> + Debug>(layer: &str, unpack_path: P) -> Result<LayerInfo> {
-    let file = File::open(unpack_path.as_ref().join(&layer))?;
+    let file = File::open(unpack_path.as_ref().join(layer))?;
     let mut archive = Archive::new(file);
 
     let mut info = LayerInfo { additions: vec![], deletions: vec![] };
@@ -229,7 +224,7 @@ fn layer_info<P: AsRef<Path> + Debug>(layer: &str, unpack_path: P) -> Result<Lay
         let f = file?;
         let path = f.path()?;
         let file_name = path.file_name().unwrap_or_default().to_str().unwrap_or_default();
-        if file_name == "" {
+        if file_name.is_empty() {
             continue;
         }
         if file_name.starts_with(WHITEOUT_PREFIX) {
@@ -256,7 +251,7 @@ fn extract_layers<P: AsRef<Path> + Debug>(
 
     for layer in layers {
         tracing::info!(layer, "unpacking layer");
-        let file = File::open(unpack_path.as_ref().join(&layer))?;
+        let file = File::open(unpack_path.as_ref().join(layer))?;
         let mut archive = Archive::new(file);
         for file in archive.entries()? {
             let mut f = file?;
