@@ -12,6 +12,25 @@ docker build -f test.Dockerfile  -t "$image_name" .
 cargo run -- --image "$image_name" dump -o "$out_dir" --verbose
 ```
 
+## audit
+
+> audit the dependencies
+
+```sh
+info=$(cargo outdated --root-deps-only --format json)
+if [ $(echo "$info" |  jq '.dependencies | length') -gt 0 ]; then
+    echo "dependencies are not up to date:"
+    echo "$info" | jq
+    exit 1
+fi
+vulns=$(cargo audit --json)
+if [ $(echo "$vulns" |  jq '.vulnerabilities.count') -gt 0 ]; then
+    echo "vulnerabilities found:"
+    echo "$vulns" | jq
+    exit 1
+fi
+```
+
 ## cross
 
 > builds the images for all supported platforms

@@ -46,14 +46,15 @@
         devShell = mkShellNoCC {
           packages = [
             rustup
+            libiconv
             cargo-audit
-            mask
-            goreleaser
+            cargo-outdated
             cargo-cross
+
+            mask
             yq-go
             ripgrep
-            # required for rust
-            libiconv
+            goreleaser
           ];
 
           shellHook = ''
