@@ -24,9 +24,9 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(long, short)]
+    #[arg(global = true)]
     /// Reference to the image that should be used
-    image: String,
+    image: Option<String>,
 
     #[arg(long, global = true)]
     /// Enable trace logs
@@ -112,11 +112,13 @@ async fn main() -> Result<()> {
         tracing_subscriber::fmt().init();
     }
 
+    let image = cli.image.ok_or(anyhow!("image must not be undefined"))?;
+
     let tmp_dir = tempfile::tempdir()?;
-    let base_name = name_from_image(&cli.image);
+    let base_name = name_from_image(&image);
 
     let archive_path = tmp_dir.path().join(format!("{base_name}.tar"));
-    save_image(&cli.image, &archive_path).await?;
+    save_image(&image, &archive_path).await?;
 
     let unpack_path = tmp_dir.path().join(&base_name);
     extract_tar(&archive_path, &unpack_path)?;
