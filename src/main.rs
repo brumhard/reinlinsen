@@ -1,11 +1,15 @@
 use anyhow::{anyhow, Result};
 use bollard::image::ListImagesOptions;
 use bollard::Docker;
+use fs_extra::dir::CopyOptions;
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
 use std::fs::{self, File};
+use std::hash::Hash;
+use std::io::stdout;
+use std::os;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;
@@ -14,6 +18,7 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tracing::instrument;
+use tracing_subscriber::fmt::format;
 
 // https://github.com/wagoodman/dive/blob/c7d121b3d72aeaded26d5731819afaf49b686df6/dive/filetree/file_tree.go#L20
 // https://github.com/moby/moby/blob/master/image/spec/v1.2.md#creating-an-image-filesystem-changeset
@@ -39,9 +44,6 @@ struct Cli {
 enum Commands {
     /// subcommands that operatate on single layers
     Layer {
-        #[arg(long, short)]
-        layer: usize,
-
         #[command(subcommand)]
         command: LayerCommands,
     },
@@ -51,7 +53,12 @@ enum Commands {
         output: PathBuf,
     },
     /// extract a file from the full dump
-    Extract {},
+    Extract {
+        #[arg(long, short)]
+        path: PathBuf,
+        #[arg(long, short)]
+        output: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -59,15 +66,29 @@ enum LayerCommands {
     /// list layers with creation command
     List {},
     /// show layer info with included files
-    Inspect {},
+    Inspect {
+        #[arg(long, short, allow_hyphen_values = true)]
+        layer: i16,
+    },
     /// dump only this layer
     Dump {
+        #[arg(long, short, allow_hyphen_values = true)]
+        layer: i16,
         #[arg(long)]
         /// include preceding layers into the output
         stack: bool,
+        #[arg(long, short)]
+        output: PathBuf,
     },
     /// extract a file from the layer
-    Extract {},
+    Extract {
+        #[arg(long, short, allow_hyphen_values = true)]
+        layer: i16,
+        #[arg(long, short)]
+        path: PathBuf,
+        #[arg(long, short)]
+        output: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -89,16 +110,120 @@ async fn main() -> Result<()> {
     let manifest_path = unpack_path.join("manifest.json");
     let manifest = read_manifest(&manifest_path)?;
 
-    let config_path = unpack_path.join(manifest.config);
+    let config_path = unpack_path.join(&manifest.config);
     let config = read_config(&config_path)?;
 
-    if let Commands::Dump { output } = cli.command {
-        extract_layers(&manifest.layers, &unpack_path, &output)?;
-    } else {
-        todo!()
+    let tmp_dump_path = tmp_dir.path().join(format!("{base_name}-fs"));
+
+    match cli.command {
+        Commands::Dump { output } => extract_layers(&manifest.layers, &unpack_path, &output)?,
+        Commands::Extract { path, output } => {
+            extract_layers(&manifest.layers, &unpack_path, &tmp_dump_path)?;
+            mv(tmp_dump_path.join(clean_path(path)?), output)?;
+        }
+        Commands::Layer { command } => match command {
+            LayerCommands::List {} => {
+                let mut result: BTreeMap<usize, &str> = BTreeMap::new();
+                let history = config.clean_history();
+                for (i, _) in manifest.layers.iter().enumerate() {
+                    result.insert(i, &history[i].created_by);
+                }
+                serde_json::to_writer_pretty(stdout(), &result)?;
+            }
+            LayerCommands::Inspect { layer } => {
+                let layer = convert_layer_num(&manifest, layer)?;
+                let info = layer_info(&manifest.layers[layer], &unpack_path)?;
+                serde_json::to_writer_pretty(stdout(), &info)?;
+            }
+            LayerCommands::Dump { layer, stack, output } => {
+                let layer = convert_layer_num(&manifest, layer)?;
+                let mut start_index = layer;
+                if stack {
+                    start_index = 0;
+                }
+                extract_layers(&manifest.layers[start_index..layer + 1], &unpack_path, &output)?
+            }
+            LayerCommands::Extract { layer, path, output } => {
+                let layer = convert_layer_num(&manifest, layer)?;
+                extract_layers(&manifest.layers[layer..layer + 1], &unpack_path, &tmp_dump_path)?;
+                mv(tmp_dump_path.join(clean_path(path)?), output)?;
+            }
+        },
     }
 
     Ok(())
+}
+
+fn convert_layer_num(manifest: &Manifest, layer: i16) -> Result<usize> {
+    let layer_usize: usize = layer.abs().try_into().expect("layer abs num should be usize");
+    let mut pos_layer = layer_usize;
+    if layer < 0 {
+        pos_layer = manifest.layers.len() - layer_usize;
+    }
+
+    if pos_layer > manifest.layers.len() - 1 {
+        return Err(anyhow!("invalid layer num, check available layers "));
+    }
+
+    Ok(pos_layer)
+}
+
+fn clean_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+    let mut path_ref = path.as_ref();
+    if path_ref.starts_with("/") {
+        path_ref = path_ref.strip_prefix("/")?;
+    }
+    Ok(path_ref.to_path_buf())
+}
+
+fn mv<P: AsRef<Path>>(source: P, dest: P) -> Result<()> {
+    let source_meta = fs::metadata(&source)?;
+    if source_meta.is_dir() {
+        fs::create_dir(&dest)?;
+        fs_extra::dir::move_dir(
+            // source must not be an absolute path
+            &source,
+            &dest,
+            &fs_extra::dir::CopyOptions { content_only: true, ..Default::default() },
+        )?;
+        return Ok(());
+    }
+
+    fs_extra::file::move_file(&source, &dest, &fs_extra::file::CopyOptions::default())?;
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct LayerInfo {
+    additions: Vec<String>,
+    deletions: Vec<String>,
+}
+
+fn layer_info<P: AsRef<Path> + Debug>(layer: &str, unpack_path: P) -> Result<LayerInfo> {
+    let file = File::open(unpack_path.as_ref().join(&layer))?;
+    let mut archive = Archive::new(file);
+
+    let mut info = LayerInfo { additions: vec![], deletions: vec![] };
+
+    for file in archive.entries()? {
+        let f = file?;
+        let path = f.path()?;
+        let file_name = path.file_name().unwrap_or_default().to_str().unwrap_or_default();
+        if file_name == "" {
+            continue;
+        }
+        if file_name.starts_with(WHITEOUT_PREFIX) {
+            let mut clean_path = path.to_path_buf();
+            clean_path.set_file_name(file_name.strip_prefix(WHITEOUT_PREFIX).unwrap());
+            info.deletions.push(clean_path.to_string_lossy().to_string());
+            continue;
+        }
+
+        info.additions.push(path.to_string_lossy().to_string());
+    }
+
+    Ok(info)
 }
 
 #[instrument(skip(layers))]
@@ -117,14 +242,10 @@ fn extract_layers<P: AsRef<Path> + Debug>(
         for file in archive.entries()? {
             let mut f = file?;
             let path = f.path()?;
-            let file_name = path
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default();
-            if file_name.starts_with(WHITEOUT_PREFIX) {
-                let delete_file = file_name.trim_start_matches(WHITEOUT_PREFIX);
-                let delete_dir = path.parent().unwrap_or(Path::new("/"));
+            let file_name = path.file_name().unwrap_or_default().to_str().unwrap_or_default();
+            if file_name.starts_with(WHITEOUT_PREFIX) && layers.len() != 1 {
+                let delete_file = file_name.strip_prefix(WHITEOUT_PREFIX).unwrap();
+                let delete_dir = path.parent().unwrap_or(Path::new(""));
                 let full_to_delete = out_dir.as_ref().join(delete_dir.join(delete_file));
                 fs::remove_dir_all(&full_to_delete)
                     .or_else(|_| fs::remove_file(&full_to_delete))?;
@@ -208,12 +329,7 @@ async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> 
     tracing::info!("connecting to docker daemon");
     let docker = Docker::connect_with_local_defaults()?;
 
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&path)
-        .await?;
+    let file = OpenOptions::new().create(true).write(true).truncate(true).open(&path).await?;
     let file = Arc::new(Mutex::new(file));
 
     tracing::info!("checking image ref");
@@ -228,9 +344,7 @@ async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> 
         0 => {
             // TODO: pull image instead
             // TODO: support passing credentials for that
-            return Err(anyhow!(
-                "image was not found locally, run docker pull first"
-            ));
+            return Err(anyhow!("image was not found locally, run docker pull first"));
         }
         1 => (),
         _ => return Err(anyhow!("ref should match exactly one image")),
