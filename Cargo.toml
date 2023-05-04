@@ -1,11 +1,14 @@
 [package]
 name = "reinlinsen"
-author = "Tobias Brumhard"
 version = "0.1.0"
+authors = ["Tobias Brumhard"]
 edition = "2021"
 description = "CLI to investigate OCI image contents."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "rl"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.71"
