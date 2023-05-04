@@ -64,7 +64,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum LayerCommands {
     /// List all layers with creation command
-    List {},
+    Ls {},
     /// Show layer info with added/removed files
     Inspect {
         #[arg(long, short, allow_hyphen_values = true)]
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
             mv(tmp_dump_path.join(clean_path(path)?), output)?;
         }
         Commands::Layer { command } => match command {
-            LayerCommands::List {} => {
+            LayerCommands::Ls {} => {
                 let mut result: BTreeMap<usize, &str> = BTreeMap::new();
                 let history = config.clean_history();
                 for (i, _) in manifest.layers.iter().enumerate() {
