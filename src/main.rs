@@ -300,7 +300,9 @@ impl Config {
 struct HistoryEntry {
     #[serde(default)]
     empty_layer: bool,
+    #[serde(default)]
     created: String,
+    #[serde(default)]
     created_by: String,
     #[serde(default)]
     comment: String,
