@@ -40,12 +40,26 @@
           };
         };
 
-        devShell = mkShell {
+        # should not include c toolchain but use host toolchain.
+        # this seems to be required to cross compile x86_64-apple-darwin on M1
+        # https://github.com/NixOS/nixpkgs/commit/9b3091a94cad63ebd0bd7aafbcfed7c133ef899d
+        devShell = mkShellNoCC {
           packages = [
+            rustup
             cargo-audit
             mask
             goreleaser
+            cargo-cross
+            yq-go
+            ripgrep
+            # required for rust
+            libiconv
           ];
+
+          shellHook = ''
+            # see https://github.com/cross-rs/cross/issues/1241
+            export CROSS_CONTAINER_OPTS="--platform linux/amd64"  
+          '';
         };
       }
     );

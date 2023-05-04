@@ -1,4 +1,6 @@
+# compilation targets
 /target
+/out
 
 # used for tests
 *.tar
