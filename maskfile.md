@@ -53,6 +53,7 @@ for target in $targets; do
     echo "building for $target"
     # specifying target-dir is a hack for https://github.com/cross-rs/cross/issues/724
     cross build --release --target "$target" --target-dir "$out_dir/$target"
-    cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl-$target"
+    arch_os=$(echo "$target" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os')
+    cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl-$arch_os"
 done
 ```
