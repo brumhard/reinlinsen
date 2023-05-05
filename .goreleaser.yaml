@@ -1,0 +1,36 @@
+project_name: rl
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+builds:
+  - skip: true
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+  extra_files:
+    - glob: out/bin/*
+signs:
+  - artifacts: checksum
+release:
+  mode: replace
+  footer: |
+    {{- with .PreviousTag }}**Full Changelog**: https://github.com/brumhard/reinlinsen/compare/{{ . }}...{{ .Tag }}{{end}}
+  extra_files:
+    - glob: out/bin/*
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: New Features and updates
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 10
+    - title: Documentation updates
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 20
+    - title: Other Work
+      order: 999
+  filters:
+    exclude:
+      - "^refactor:"
+      - "^chore"

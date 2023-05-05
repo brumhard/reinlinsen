@@ -5,3 +5,4 @@
 # used for tests
 *.tar
 reinlinsen-test*
+dist/
