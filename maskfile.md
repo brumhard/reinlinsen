@@ -56,6 +56,7 @@ targets=$(yq -o json -p toml -r '.toolchain.targets[]' rust-toolchain)
 if [ "$filter" != "" ]; then
     targets=$(echo "$targets"|rg "$filter")
 fi
+rm -rf "$out_dir"/bin
 mkdir -p "$out_dir"/bin
 for target in $targets; do
     echo "building for $target"
