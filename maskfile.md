@@ -89,6 +89,7 @@ if [ "$next_tag" = "" ]; then
 fi
 mask cross
 git tag "$next_tag"
+git push
 git push --tags
 goreleaser release --clean
 ```
