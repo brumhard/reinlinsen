@@ -47,9 +47,9 @@ if [ $(echo "$vulns" |  jq '.vulnerabilities.count') -gt 0 ]; then
 fi
 ```
 
-## cross
+## build
 
-> builds the images for all supported platforms
+> builds the images for (possibly filtered) targets
 
 **OPTIONS**
 
@@ -59,18 +59,30 @@ fi
   * desc: filter all targets with the given string, e.g. "linux", "aarch64"
 
 ```sh
+function to_arch_os () {
+    echo "$1" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os'
+}
+
 out_dir="out"
 targets=$(yq -o json -p toml -r '.toolchain.targets[]' rust-toolchain.toml)
 if [ "$filter" != "" ]; then
     targets=$(echo "$targets"|rg "$filter")
 fi
+
 rm -rf "$out_dir"/bin
 mkdir -p "$out_dir"/bin
+
+target_os_list=$(to_arch_os "$targets" | cut -d- -f2 |sort |uniq)
+build_cmd="cargo"
+if [ "$(echo "$target_os_list" | wc -l)" -gt 1 ]; then
+    build_cmd="cross"
+fi
+
 for target in $targets; do
     echo "building for $target"
     # specifying target-dir is a hack for https://github.com/cross-rs/cross/issues/724
-    cross build --release --target "$target" --target-dir "$out_dir/$target"
-    arch_os=$(echo "$target" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os')
+    $build_cmd build --release --target "$target" --target-dir "$out_dir/$target"
+    arch_os=$(to_arch_os "$target")
     cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl-$arch_os"
 done
 ```
@@ -124,6 +136,6 @@ git push --tags
 if [ $local ]; then
     mask tag
 fi
-mask cross
+mask build
 goreleaser release --clean
 ```
