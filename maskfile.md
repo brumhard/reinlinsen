@@ -75,9 +75,9 @@ for target in $targets; do
 done
 ```
 
-## release
+## tag
 
-> creates a new release
+> creates a new tag
 
 **OPTIONS**
 
@@ -104,9 +104,26 @@ if ! echo "$next_tag" | rg -q 'v([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]
     echo "not a valid version"
     exit 1
 fi
-mask cross
 git tag "$next_tag"
 git push
 git push --tags
+```
+
+## release
+
+> creates a new release
+
+**OPTIONS**
+
+* local
+  * flags: --local
+  * type: bool
+  * desc: if enabled mask tag will be run prior to release
+
+```sh
+if [ $local ]; then
+    mask tag
+fi
+mask cross
 goreleaser release --clean
 ```
