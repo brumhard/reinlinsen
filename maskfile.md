@@ -60,7 +60,7 @@ fi
 
 ```sh
 out_dir="out"
-targets=$(yq -o json -p toml -r '.toolchain.targets[]' rust-toolchain)
+targets=$(yq -o json -p toml -r '.toolchain.targets[]' rust-toolchain.toml)
 if [ "$filter" != "" ]; then
     targets=$(echo "$targets"|rg "$filter")
 fi

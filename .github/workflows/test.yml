@@ -1,0 +1,26 @@
+name: test
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          # Mostly to avoid GitHub rate limiting
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Install tooling
+        run: |
+          nix profile install .#tooling
+          echo "${HOME}/.nix-profile/bin" >> $GITHUB_PATH
+      - name: Run audit
+        run: mask audit
+      - name: Run lint
+        run: mask lint
+      - name: Show help
+        run: cargo run -- help
