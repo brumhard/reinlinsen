@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The below input_file is file ".git/COMMIT_EDITMSG" where commits are stored
+commit_msg=$(head -n1 "$1")
+echo "$commit_msg" | commitlint --extends @commitlint/config-conventional

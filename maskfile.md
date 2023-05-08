@@ -1,5 +1,13 @@
 # Tasks
 
+## init
+
+> initializes the dev env in the repo
+
+```sh
+git config --local core.hooksPath .githooks/
+```
+
 ## test-run
 
 > builds the test docker image and runs dump

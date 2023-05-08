@@ -55,12 +55,13 @@
             yq-go
             ripgrep
             goreleaser
+            commitlint
           ];
 
-          shellHook = ''
-            # see https://github.com/cross-rs/cross/issues/1241
-            export CROSS_CONTAINER_OPTS="--platform linux/amd64"  
-          '';
+          # https://github.com/openebs/mayastor-control-plane/blob/develop/shell.nix
+          NODE_PATH = "${nodePackages."@commitlint/config-conventional"}/lib/node_modules";
+          # see https://github.com/cross-rs/cross/issues/1241
+          CROSS_CONTAINER_OPTS = "--platform linux/amd64";
         };
       }
     );
