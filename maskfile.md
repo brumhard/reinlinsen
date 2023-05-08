@@ -93,7 +93,11 @@ if [ "$(git status --porcelain)" != "" ]; then
 fi
 if [ "$next_tag" = "" ]; then
     current_tag=$(git tag |tail -1)
-    read -r -p "Enter next tag (current: '$current_tag'): " next_tag 
+    proposed_tag=$(svu n)
+    read -r -p "Enter next tag or accept proposed (current: '$current_tag', proposed: '$proposed_tag'): " next_tag 
+    if [ "$next_tag" = "" ]; then
+        next_tag="$proposed_tag"
+    fi
 fi
 # check valid version
 if ! echo "$next_tag" | rg -q 'v([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)'; then

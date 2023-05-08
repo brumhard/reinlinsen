@@ -55,6 +55,7 @@
             yq-go
             ripgrep
             goreleaser
+            svu
             commitlint
           ];
 
