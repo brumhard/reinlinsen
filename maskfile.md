@@ -87,6 +87,11 @@ if [ "$next_tag" = "" ]; then
     current_tag=$(git tag |tail -1)
     read -r -p "Enter next tag (current: '$current_tag'): " next_tag 
 fi
+# check valid version
+if ! echo "$next_tag" | rg -q 'v([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)'; then
+    echo "not a valid version"
+    exit 1
+fi
 mask cross
 git tag "$next_tag"
 git push
