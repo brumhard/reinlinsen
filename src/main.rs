@@ -278,7 +278,7 @@ struct Manifest {
     #[serde(rename = "Config")]
     config: String,
     #[serde(rename = "RepoTags")]
-    repo_tags: Vec<String>,
+    repo_tags: Option<Vec<String>>,
     #[serde(rename = "Layers")]
     layers: Vec<String>,
 }
@@ -308,13 +308,17 @@ struct HistoryEntry {
     comment: String,
 }
 
+#[instrument]
 fn read_config<P: AsRef<Path> + Debug>(path: P) -> Result<Config> {
+    tracing::info!("reading config");
     let config_str = fs::read_to_string(path)?;
     let config: Config = serde_json::from_str(&config_str)?;
     Ok(config)
 }
 
+#[instrument]
 fn read_manifest<P: AsRef<Path> + Debug>(path: P) -> Result<Manifest> {
+    tracing::info!("reading manifest");
     let manifest_str = fs::read_to_string(path)?;
     let mut manifests: Vec<Manifest> = serde_json::from_str(&manifest_str)?;
 
