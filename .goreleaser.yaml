@@ -12,7 +12,7 @@ signs:
 release:
   mode: replace
   footer: |
-    {{- with .PreviousTag }}**Full Changelog**: https://github.com/brumhard/reinlinsen/compare/{{ . }}...{{ .Tag }}{{end}}
+    **Full Changelog**: https://github.com/brumhard/reinlinsen/compare/{{ .PreviousTag }}...{{ .Tag }}
   extra_files:
     - glob: out/bin/*
 changelog:
