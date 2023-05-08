@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! git diff HEAD..FETCH_HEAD --name-only | rg -q '^(src/|Cargo\.|rust)'; then
+    echo "no src files changed"
+    exit 0
+fi
+
 mask lint
 mask audit
