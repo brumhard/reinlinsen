@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! git diff HEAD..FETCH_HEAD --name-only | rg -q '^(src/|Cargo\.|rust)'; then
-    echo "no src files changed"
-    exit 0
+# The check will only be skipped if the the remote branch exists (first if)
+# and the diff with that remote doesn't contain any source files (second if).
+if remote_branch=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null); then
+    if ! git diff HEAD.."$remote_branch" --name-only | rg -q '^(src/|Cargo\.|rust)'; then
+        echo "no src files changed"
+        exit 0
+    fi
 fi
 
 mask lint
