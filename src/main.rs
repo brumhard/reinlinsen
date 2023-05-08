@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::fs::{self, File};
-use std::io::stdout;
+use std::io::{self, stdout};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;
@@ -43,6 +43,8 @@ enum Commands {
         #[command(subcommand)]
         command: LayerCommands,
     },
+    /// Print configuration info
+    Info {},
     /// Dump all image layers into output
     Dump {
         #[arg(long, short)]
@@ -112,15 +114,22 @@ async fn main() -> Result<()> {
         tracing_subscriber::fmt().init();
     }
 
-    let image = cli.image.ok_or(anyhow!("image must not be undefined"))?;
+    let cache_dir =
+        dirs::cache_dir().ok_or(anyhow!("couldn't define cache dir"))?.join("reinlinsen");
+    fs::create_dir_all(&cache_dir).map_err(|_| anyhow!("failed to initialize cache dir"))?;
 
-    let tmp_dir = tempfile::tempdir()?;
+    // match info command here to not require image to be defined
+    if matches!(cli.command, Commands::Info {}) {
+        println!("cache: {}", cache_dir.display());
+        return Ok(());
+    }
+
+    let image = cli.image.ok_or(anyhow!("image must not be undefined"))?;
     let base_name = name_from_image(&image);
 
-    let archive_path = tmp_dir.path().join(format!("{base_name}.tar"));
-    save_image(&image, &archive_path).await?;
-
-    let unpack_path = tmp_dir.path().join(&base_name);
+    let archive_path = save_image(&image, &cache_dir).await?;
+    let mut unpack_path = archive_path.clone();
+    unpack_path.set_file_name(archive_path.file_stem().unwrap());
     extract_tar(&archive_path, &unpack_path)?;
 
     let manifest_path = unpack_path.join("manifest.json");
@@ -129,9 +138,12 @@ async fn main() -> Result<()> {
     let config_path = unpack_path.join(&manifest.config);
     let config = read_config(&config_path)?;
 
+    let tmp_dir = tempfile::tempdir()?;
     let tmp_dump_path = tmp_dir.path().join(format!("{base_name}-fs"));
 
     match cli.command {
+        // info command is handled before image
+        Commands::Info {} => (),
         Commands::Dump { output } => extract_layers(&manifest.layers, &unpack_path, &output)?,
         Commands::Extract { path, output } => {
             extract_layers(&manifest.layers, &unpack_path, &tmp_dump_path)?;
@@ -331,10 +343,14 @@ fn read_manifest<P: AsRef<Path> + Debug>(path: P) -> Result<Manifest> {
 
 #[instrument]
 fn extract_tar<P: AsRef<Path> + Debug>(archive_path: P, out_dir: P) -> Result<()> {
-    tracing::info!("recreating output dir");
     let file = File::open(archive_path)?;
-    _ = fs::remove_dir_all(&out_dir);
-    fs::create_dir(&out_dir)?;
+    match fs::create_dir(&out_dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            tracing::info!("skipping, dir is already there");
+            return Ok(());
+        }
+        other => other,
+    }?;
 
     tracing::info!("unpacking archive");
     let mut archive = Archive::new(file);
@@ -347,12 +363,9 @@ fn extract_tar<P: AsRef<Path> + Debug>(archive_path: P, out_dir: P) -> Result<()
 }
 
 #[instrument]
-async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> {
+async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<PathBuf> {
     tracing::info!("connecting to docker daemon");
     let docker = Docker::connect_with_local_defaults()?;
-
-    let file = OpenOptions::new().create(true).write(true).truncate(true).open(&path).await?;
-    let file = Arc::new(Mutex::new(file));
 
     tracing::info!("checking image ref");
     let list = docker
@@ -362,15 +375,25 @@ async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> 
         }))
         .await?;
 
-    match list.len() {
+    let image_id = match list.len() {
         0 => {
-            // TODO: pull image instead
-            // TODO: support passing credentials for that
             return Err(anyhow!("image was not found locally, run docker pull first"));
         }
-        1 => (),
+        1 => list[0].id.clone(),
         _ => return Err(anyhow!("ref should match exactly one image")),
-    }
+    };
+
+    let path = path.as_ref().join(format!("{image_id}.tar"));
+    let file = match OpenOptions::new().create_new(true).write(true).open(&path).await {
+        // if the file already exists, there's no need to download it again
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            tracing::info!("skipping, file is already there");
+            return Ok(path);
+        }
+        other => other,
+    }?;
+
+    let file = Arc::new(Mutex::new(file));
 
     tracing::info!("exporting image to tar");
     docker
@@ -385,7 +408,7 @@ async fn save_image<P: AsRef<Path> + Debug>(image: &str, path: P) -> Result<()> 
         })
         .await?;
 
-    Ok(())
+    Ok(path)
 }
 
 fn name_from_image<T: AsRef<str>>(image: T) -> String {
