@@ -30,24 +30,6 @@
             inherit name version;
             src = ./.;
           };
-          # included in packages to make it installable in ci
-          tooling = pkgs.buildEnv {
-            name = "tooling";
-            paths = with pkgs; [
-              rustup
-              libiconv
-              cargo-audit
-              cargo-outdated
-              cargo-cross
-
-              mask
-              yq-go
-              ripgrep
-              goreleaser
-              svu
-              commitlint
-            ];
-          };
         };
 
         apps = {
@@ -62,7 +44,19 @@
         # this seems to be required to cross compile x86_64-apple-darwin on M1
         # https://github.com/NixOS/nixpkgs/commit/9b3091a94cad63ebd0bd7aafbcfed7c133ef899d
         devShell = mkShellNoCC {
-          packages = [ packages.tooling ];
+          packages = [
+            rustup
+            cargo-audit
+            cargo-outdated
+            cargo-cross
+
+            mask
+            yq-go
+            ripgrep
+            goreleaser
+            svu
+            commitlint
+          ];
 
           # https://github.com/openebs/mayastor-control-plane/blob/develop/shell.nix
           NODE_PATH = "${nodePackages."@commitlint/config-conventional"}/lib/node_modules";

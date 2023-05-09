@@ -4,7 +4,7 @@
 
 > initializes the dev env in the repo
 
-```sh
+```bash
 git config --local core.hooksPath .githooks/
 ```
 
@@ -12,7 +12,7 @@ git config --local core.hooksPath .githooks/
 
 > builds the test docker image and runs dump
 
-```sh
+```bash
 image_name="reinlinsen-test"
 out_dir="$image_name-fs"
 rm -rf "$out_dir"
@@ -24,7 +24,7 @@ cargo run -- dump "$image_name" -o "$out_dir" --verbose
 
 > runs cargo clippy
 
-```sh
+```bash
 cargo clippy -- -W clippy::pedantic
 ```
 
@@ -32,7 +32,7 @@ cargo clippy -- -W clippy::pedantic
 
 > runs audit for dependencies
 
-```sh
+```bash
 info=$(cargo outdated --root-deps-only --format json)
 if [ $(echo "$info" |  jq '.dependencies | length') -gt 0 ]; then
     echo "dependencies are not up to date:"
@@ -58,31 +58,27 @@ fi
   * type: string
   * desc: filter all targets with the given string, e.g. "linux", "aarch64"
 
-```sh
-function to_arch_os () {
-    echo "$1" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os'
-}
-
-out_dir="out"
+```bash
+set -eo pipefail
 targets=$(yq -o json -p toml -r '.toolchain.targets[]' rust-toolchain.toml)
 if [ "$filter" != "" ]; then
-    targets=$(echo "$targets"|rg "$filter")
+    targets=$(echo "$targets" | rg "$filter")
 fi
 
+out_dir="out"
 rm -rf "$out_dir"/bin
 mkdir -p "$out_dir"/bin
 
-target_os_list=$(to_arch_os "$targets" | cut -d- -f2 |sort |uniq)
-build_cmd="cargo"
-if [ "$(echo "$target_os_list" | wc -l)" -gt 1 ]; then
-    build_cmd="cross"
+build_args=""
+if [ $verbose ]; then
+    build_args="--verbose"
 fi
 
 for target in $targets; do
     echo "building for $target"
     # specifying target-dir is a hack for https://github.com/cross-rs/cross/issues/724
-    $build_cmd build --release --target "$target" --target-dir "$out_dir/$target"
-    arch_os=$(to_arch_os "$target")
+    cross build --release --target "$target" --target-dir "$out_dir/$target" $build_args
+    arch_os=$(echo "$target" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os')
     cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl-$arch_os"
 done
 ```
@@ -98,7 +94,7 @@ done
   * desc: tag for the next release version
   * type: string
 
-```sh
+```bash
 if [ "$(git status --porcelain)" != "" ]; then
     echo "nope too dirty"
     exit 1
@@ -132,10 +128,10 @@ git push --tags
   * type: bool
   * desc: if enabled mask tag will be run prior to release
 
-```sh
+```bash
 if [ $local ]; then
-    mask tag
+    $MASK tag
 fi
-mask build
+$MASK build
 goreleaser release --clean
 ```

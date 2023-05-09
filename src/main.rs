@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::fs::{self, File};
-use std::io::{self, stdout};
+use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tar::Archive;

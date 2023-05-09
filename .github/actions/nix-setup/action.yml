@@ -1,0 +1,31 @@
+name: Setup nix
+description: Sets up nix and tools
+inputs:
+  tools_package:
+    description: Name of the package in the flake.nix file that provides all necessary tools
+    required: false
+    default: "tooling"
+  token:
+    description: GitHub PAT used for nix cache
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # https://github.com/actions/cache/issues/749
+    # there seems to be no way to cache nix stuff really
+    # setting the store as suggested in the issue doesn't work
+    - name: Install Nix
+      uses: cachix/install-nix-action@v20
+      with:
+        # token to avoid GitHub rate limiting
+        extra_nix_config: |
+          access-tokens = github.com=${{ inputs.token }}
+    - name: Load environment
+      # https://lobste.rs/s/qbsbcj/streamline_your_github_actions#c_1alxuy
+      # NIX_STORE is required by cross to detect nix
+      # This could break if env vars are set in shellHook etc.
+      shell: bash
+      run: |
+        nix develop -c bash -c 'echo $PATH' >> "$GITHUB_PATH"
+        echo "NIX_STORE=/nix/store" >> $GITHUB_ENV

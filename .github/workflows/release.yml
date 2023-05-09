@@ -1,0 +1,60 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { runner: macos-latest, filter: darwin }
+          - { runner: ubuntu-latest, filter: linux }
+    name: ${{ matrix.filter }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/nix-setup
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            out/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Build ${{ matrix.filter }} targets
+        run: mask build --filter ${{ matrix.filter }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.filter }}
+          path: out/bin/*
+  release:
+    permissions:
+      contents: write
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # required for goreleaser
+          fetch-depth: 0
+      - uses: ./.github/actions/nix-setup
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v3
+        with:
+          path: out/
+      - name: Move artifacts to /out/bin
+        run: find out/ -type f -exec cp {} out/bin/ \;
+      - name: Release
+        run: goreleaser release --clean
