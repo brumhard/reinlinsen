@@ -55,7 +55,9 @@ jobs:
         with:
           path: out/
       - name: Move artifacts to /out/bin
-        run: find out/ -type f -exec cp {} out/bin/ \;
+        run: |
+          mkdir -p out/bin/
+          find out/ -type f -exec cp {} out/bin/ \;
       - name: Release
         run: goreleaser release --clean
         env:
