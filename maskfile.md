@@ -95,6 +95,7 @@ done
   * type: string
 
 ```bash
+set -eo pipefail
 if [ "$(git status --porcelain)" != "" ]; then
     echo "nope too dirty"
     exit 1
@@ -112,26 +113,20 @@ if ! echo "$next_tag" | rg -q 'v([0-9]|[1-9][0-9]*)\.([0-9]|[1-9][0-9]*)\.([0-9]
     echo "not a valid version"
     exit 1
 fi
+# set version without leading v
+cargo set-version "${next_tag:1}"
+git add Cargo.*
+git commit --no-verify --message "chore: bump package to $next_tag"
 git tag "$next_tag"
-git push
-git push --tags
+git push --no-verify
+git push --no-verify --tags
 ```
 
-## release
+## test-release
 
-> creates a new release
-
-**OPTIONS**
-
-* local
-  * flags: --local
-  * type: bool
-  * desc: if enabled mask tag will be run prior to release
+> creates a new release snapshot
 
 ```bash
-if [ $local ]; then
-    $MASK tag
-fi
-$MASK build
-goreleaser release --clean
+$MASK build --filter darwin
+goreleaser release --snapshot --skip-validate --clean
 ```

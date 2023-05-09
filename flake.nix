@@ -49,6 +49,7 @@
             cargo-audit
             cargo-outdated
             cargo-cross
+            cargo-edit
 
             mask
             yq-go
