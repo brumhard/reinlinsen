@@ -53,11 +53,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/download-artifact@v3
         with:
-          path: out/
-      - name: Move artifacts to /out/bin
-        run: |
-          mkdir -p out/bin/
-          find out/ -type f -exec cp {} out/bin/ \;
+          path: out/bin/
       - name: Release
         run: goreleaser release --clean
         env:
