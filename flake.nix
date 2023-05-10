@@ -54,9 +54,12 @@
             mask
             yq-go
             ripgrep
+            fd
             goreleaser
             svu
             commitlint
+            syft
+            cosign
           ];
 
           # https://github.com/openebs/mayastor-control-plane/blob/develop/shell.nix

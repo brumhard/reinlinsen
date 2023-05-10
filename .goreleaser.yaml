@@ -1,18 +1,78 @@
-project_name: rl
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  name_template: "{{ incpatch .Version }}_next"
 builds:
-  - skip: true
+  - gobinary: "true" # forcing noop builds with coreutils true command
+    no_main_check: true
+    # the following two options are a hack to strip the suffixes
+    # and keep a flat file tree
+    # https://goreleaser.com/customization/builds/#a-note-about-folder-names-inside-dist
+    binary: "rl_{{ .Os }}_{{ .Arch }}"
+    no_unique_dist_dir: true
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    hooks:
+      post: ["fd {{.Name}} out/bin/ -X cp {} {{.Path}}"]
+universal_binaries:
+  - replace: false
+
+source:
+  enabled: true
+  rlcp: true
+  name_template: "{{ .ProjectName }}-source"
+sboms:
+  - artifacts: source
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
-  extra_files:
-    - glob: out/bin/**
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    rlcp: true
+nfpms:
+  - maintainer: Tobias Brumhard <code@brumhard.com>
+    description: &desc Inspect and dump OCI images
+    homepage: &homepage https://github.com/brumhard/{{ .ProjectName }}
+    file_name_template: "{{ .PackageName }}_{{ .Os }}_{{ .Arch }}"
+    license: &license "MIT"
+    formats:
+      - deb
+      - rpm
+      - apk
+brews:
+  - description: *desc
+    homepage: *homepage
+    license: *license
+    tap:
+      owner: brumhard
+      name: tap
+      # https://goreleaser.com/errors/resource-not-accessible-by-integration/#2-use-a-personal-access-token-pat-specifically-for-the-integration
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+
+signs:
+  # keyless signing with cosign and github actions token
+  # https://github.com/sigstore/cosign/blob/cc969943428c109904d6a1888eb44c1576769cbd/.goreleaser.yml#L165
+  - env:
+      - COSIGN_YES=true
+    cmd: cosign
+    signature: "${artifact}-keyless.sig"
+    certificate: "${artifact}-keyless.pem"
+    args:
+      - sign-blob
+      - --output-signature
+      - ${artifact}-keyless.sig
+      - --output-certificate
+      - ${artifact}-keyless.pem
+      - ${artifact}
+    artifacts: all
+
 release:
   mode: replace
   footer: |
-    **Full Changelog**: https://github.com/brumhard/reinlinsen/compare/{{ .PreviousTag }}...{{ .Tag }}
-  extra_files:
-    - glob: out/bin/**
+    **Full Changelog**: https://github.com/brumhard/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
 changelog:
   sort: asc
   use: github
@@ -30,5 +90,5 @@ changelog:
       order: 999
   filters:
     exclude:
-      - "^refactor:"
+      - "^refactor"
       - "^chore"

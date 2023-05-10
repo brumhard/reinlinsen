@@ -78,8 +78,12 @@ for target in $targets; do
     echo "building for $target"
     # specifying target-dir is a hack for https://github.com/cross-rs/cross/issues/724
     cross build --release --target "$target" --target-dir "$out_dir/$target" $build_args
-    arch_os=$(echo "$target" | rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '$arch-$os')
-    cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl-$arch_os"
+    arch_os=$(echo "$target" | 
+        rg '^(?P<arch>.+?)-\w+-(?P<os>\w+)(-\w*)?$' -r '${os}_${arch}' |
+        sed s/aarch64/arm64/g | 
+        sed s/x86_64/amd64/g
+    )
+    cp "$out_dir/$target/$target/release/rl" "$out_dir/bin/rl_$arch_os"
 done
 ```
 
@@ -126,7 +130,16 @@ git push --no-verify --tags
 
 > creates a new release snapshot
 
+**OPTIONS**
+
+* build
+  * flags: --build -b
+  * type: bool
+  * desc: toggle to build before releasing
+
 ```bash
-$MASK build --filter darwin
-goreleaser release --snapshot --skip-validate --clean
+if [ $build ]; then
+    $MASK build
+fi
+goreleaser release --snapshot --skip-validate --clean --skip-sign
 ```
