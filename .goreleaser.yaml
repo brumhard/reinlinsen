@@ -51,7 +51,7 @@ brews:
       # https://goreleaser.com/errors/resource-not-accessible-by-integration/#2-use-a-personal-access-token-pat-specifically-for-the-integration
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     install: |
-      bin.install rl
+      bin.install "rl"
 signs:
   # keyless signing with cosign and github actions token
   # https://github.com/sigstore/cosign/blob/cc969943428c109904d6a1888eb44c1576769cbd/.goreleaser.yml#L165
