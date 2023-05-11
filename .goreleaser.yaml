@@ -2,12 +2,8 @@ snapshot:
   name_template: "{{ incpatch .Version }}_next"
 builds:
   - gobinary: "true" # forcing noop builds with coreutils true command
+    binary: rl
     no_main_check: true
-    # the following two options are a hack to strip the suffixes
-    # and keep a flat file tree
-    # https://goreleaser.com/customization/builds/#a-note-about-folder-names-inside-dist
-    binary: "rl_{{ .Os }}_{{ .Arch }}"
-    no_unique_dist_dir: true
     goos:
       - darwin
       - linux
@@ -15,7 +11,10 @@ builds:
       - amd64
       - arm64
     hooks:
-      post: ["fd {{.Name}} out/bin/ -X cp {} {{.Path}}"]
+      post:
+        # trimsuffix is required to strip the suffix that the rust bins don't contain
+        # https://goreleaser.com/customization/builds/#why-is-there-a-_v1-suffix-on-amd64-builds
+        - cmd: 'fd -1 {{trimsuffix .Target "_v1"}} out/bin/ -x bash -c "mkdir -p {{ dir .Path }} && cp {} {{.Path}}"'
 universal_binaries:
   - replace: false
 
@@ -51,22 +50,20 @@ brews:
       name: tap
       # https://goreleaser.com/errors/resource-not-accessible-by-integration/#2-use-a-personal-access-token-pat-specifically-for-the-integration
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-
+    install: |
+      bin.install rl
 signs:
   # keyless signing with cosign and github actions token
   # https://github.com/sigstore/cosign/blob/cc969943428c109904d6a1888eb44c1576769cbd/.goreleaser.yml#L165
-  - env:
-      - COSIGN_YES=true
-    cmd: cosign
+  - cmd: cosign
     signature: "${artifact}-keyless.sig"
     certificate: "${artifact}-keyless.pem"
     args:
       - sign-blob
-      - --output-signature
-      - ${artifact}-keyless.sig
-      - --output-certificate
-      - ${artifact}-keyless.pem
+      - --output-signature=${artifact}-keyless.sig
+      - --output-certificate=${artifact}-keyless.pem
       - ${artifact}
+      - --yes
     artifacts: all
 
 release:
