@@ -122,6 +122,7 @@ cargo set-version "${next_tag:1}"
 git add Cargo.*
 git commit --no-verify --message "chore: bump package to $next_tag"
 git tag "$next_tag"
+git tag latest --force
 git push --no-verify
 git push --no-verify --tags
 ```
