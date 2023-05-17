@@ -124,7 +124,7 @@ git commit --no-verify --message "chore: bump package to $next_tag"
 git tag "$next_tag"
 git tag latest --force
 git push --no-verify
-git push --no-verify --tags
+git push --no-verify --tags --force
 ```
 
 ## test-release
