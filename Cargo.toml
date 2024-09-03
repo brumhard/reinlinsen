@@ -1,6 +1,6 @@
 [package]
 name = "reinlinsen"
-version = "0.3.5"
+version = "0.3.6"
 authors = ["Tobias Brumhard"]
 edition = "2021"
 description = "CLI to investigate OCI image contents."
