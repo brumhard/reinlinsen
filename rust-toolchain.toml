@@ -1,12 +1,10 @@
 [toolchain]
-channel = "1.69"
+channel = "1.80"
 targets = [
     "aarch64-apple-darwin",
     "x86_64-apple-darwin",
     "aarch64-unknown-linux-musl",
-    "x86_64-unknown-linux-musl"
+    "x86_64-unknown-linux-musl",
 ]
-components = [
-    "rustfmt", "clippy"
-]
+components = ["rustfmt", "clippy"]
 profile = "minimal"
