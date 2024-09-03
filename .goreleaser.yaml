@@ -52,19 +52,19 @@ brews:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     install: |
       bin.install "rl"
-signs:
-  # keyless signing with cosign and github actions token
-  # https://github.com/sigstore/cosign/blob/cc969943428c109904d6a1888eb44c1576769cbd/.goreleaser.yml#L165
-  - cmd: cosign
-    signature: "${artifact}-keyless.sig"
-    certificate: "${artifact}-keyless.pem"
-    args:
-      - sign-blob
-      - --output-signature=${artifact}-keyless.sig
-      - --output-certificate=${artifact}-keyless.pem
-      - ${artifact}
-      - --yes
-    artifacts: all
+# signs:
+#   # keyless signing with cosign and github actions token
+#   # https://github.com/sigstore/cosign/blob/cc969943428c109904d6a1888eb44c1576769cbd/.goreleaser.yml#L165
+#   - cmd: cosign
+#     signature: "${artifact}-keyless.sig"
+#     certificate: "${artifact}-keyless.pem"
+#     args:
+#       - sign-blob
+#       - --output-signature=${artifact}-keyless.sig
+#       - --output-certificate=${artifact}-keyless.pem
+#       - ${artifact}
+#       - --yes
+#     artifacts: all
 
 release:
   mode: replace
