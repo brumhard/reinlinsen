@@ -142,5 +142,5 @@ git push --no-verify --tags --force
 if [ $build ]; then
     $MASK build
 fi
-goreleaser release --snapshot --skip-validate --clean --skip-sign
+goreleaser release --snapshot --clean
 ```

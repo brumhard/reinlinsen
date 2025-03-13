@@ -51,7 +51,7 @@
           # should not include c toolchain but use host toolchain.
           # this seems to be required to cross compile x86_64-apple-darwin on M1
           # https://github.com/NixOS/nixpkgs/commit/9b3091a94cad63ebd0bd7aafbcfed7c133ef899d
-          devShell = mkShellNoCC {
+          devShell = mkShell {
             packages = [
               rustup
               cargo-audit
@@ -65,13 +65,10 @@
               fd
               goreleaser
               svu
-              commitlint
               syft
               cosign
             ];
 
-            # https://github.com/openebs/mayastor-control-plane/blob/develop/shell.nix
-            NODE_PATH = "${nodePackages."@commitlint/config-conventional"}/lib/node_modules";
             # see https://github.com/cross-rs/cross/issues/1241
             CROSS_CONTAINER_OPTS = "--platform linux/amd64";
           };
